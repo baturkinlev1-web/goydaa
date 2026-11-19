@@ -1,0 +1,65 @@
+
+name: Build Crypto G APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Crypto_G.zip'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip build-essential \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev \
+            libffi-dev libssl-dev cmake \
+            libltdl-dev
+
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer==1.6.0 Cython==0.29.33
+
+      - name: Extract project
+        run: |
+          unzip -q Crypto_G.zip -d extracted
+          find extracted -name buildozer.spec
+
+      - name: Build APK
+        run: |
+          SPEC=$(find extracted -name buildozer.spec -print -quit)
+          if [ -z "$SPEC" ]; then
+            echo "buildozer.spec not found"
+            exit 1
+          fi
+          cd "$(dirname "$SPEC")"
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Crypto-G-APK
+          path: extracted/**/bin/*.apk
+          if-no-files-found: error
