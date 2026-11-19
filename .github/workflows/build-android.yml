@@ -13,21 +13,21 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -39,21 +39,40 @@ jobs:
 
       - name: Install Buildozer
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install buildozer==1.6.0 Cython==0.29.33
 
-      - name: Extract project
+      - name: Check project archive
         run: |
+          if [ ! -f Crypto_G.zip ]; then
+            echo "ERROR: Crypto_G.zip not found in repository root"
+            exit 1
+          fi
+          mkdir -p extracted
           unzip -q Crypto_G.zip -d extracted
-          find extracted -name buildozer.spec
+
+      - name: Configure Android build
+        run: |
+          SPEC=$(find extracted -name buildozer.spec -print -quit)
+
+          if [ -z "$SPEC" ]; then
+            echo "ERROR: buildozer.spec not found"
+            exit 1
+          fi
+
+          echo "Using spec: $SPEC"
+
+          sed -i '/^[[:space:]]*android\.archs\?[[:space:]]*=/d' "$SPEC"
+          sed -i '/^[[:space:]]*android\.accept_sdk_license[[:space:]]*=/d' "$SPEC"
+
+          printf '\nandroid.archs = armeabi-v7a\n' >> "$SPEC"
+          printf 'android.accept_sdk_license = True\n' >> "$SPEC"
+
+          cat "$SPEC"
 
       - name: Build APK
         run: |
           SPEC=$(find extracted -name buildozer.spec -print -quit)
-          if [ -z "$SPEC" ]; then
-            echo "buildozer.spec not found"
-            exit 1
-          fi
           cd "$(dirname "$SPEC")"
           buildozer android debug
 
